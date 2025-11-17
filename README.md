@@ -19,8 +19,6 @@ PYTHONPATH=. python benchmarks/run_benchmark.py
 Analyze
 python notebooks/analysis.py
 
-text
-
 ## 📊 Key Results
 
 | Metric | Value |
