@@ -2,363 +2,330 @@
 
 ## Abstract
 
-Large language models (LLMs) have become central to modern AI applications, yet their deployment remains challenging on resource-constrained edge devices. Recent advances in quantization and specialized inference frameworks like MLX have enabled efficient local inference on Apple Silicon. This paper presents a systematic benchmarking study of LLM inference performance on Mac M4 using the MLX framework with 4-bit quantization. We evaluate Llama 3.2-1B across multiple output lengths (64, 128, 256 tokens) and sampling temperatures, measuring both latency and throughput. Our results show that a single Mac M4 can achieve an average inference latency of 2.68 seconds with a throughput of 51.9 tokens per second, demonstrating the viability of local, privacy-preserving LLM inference on consumer-grade Apple Silicon hardware. We release a fully reproducible benchmark suite and analysis pipeline to enable future research in efficient edge AI.
+Large language models (LLMs) have become central to modern AI applications, yet their deployment remains challenging on resource-constrained edge devices. Recent advances in quantization and specialized inference frameworks like MLX have enabled efficient local inference on Apple Silicon. This paper presents a systematic benchmarking study of LLM inference performance on a Mac M4 system using the MLX framework with 4‑bit quantization. We evaluate Llama 3.2‑1B across multiple output lengths (64, 128, 256 tokens) and sampling temperatures, measuring both latency and throughput. Our results show that a single Mac M4 can achieve an average inference latency of 2.68 seconds with a throughput of 51.9 tokens per second, demonstrating the viability of local, privacy-preserving LLM inference on consumer-grade Apple Silicon hardware. We release a fully reproducible benchmark suite and analysis pipeline to enable future research in efficient edge AI.
 
 **Keywords:** Large Language Models, Edge AI, Apple Silicon, MLX, Quantization, Inference Optimization, Benchmarking
 
 ---
 
-## 1. Introduction
+## 1 Introduction
 
-### 1.1 Motivation
+The rapid advancement of large language models has created unprecedented opportunities for natural language understanding and generation. However, deploying these models remains challenging: cloud-based inference incurs latency, cost, and privacy concerns, while on-device inference has historically been constrained by compute and memory limits.
 
-The rapid advancement of large language models has created unprecedented opportunities for natural language understanding and generation. However, deploying these models remains challenging: cloud-based inference incurs latency, cost, and privacy concerns, while on-device inference has historically been limited by computational and memory constraints.
+Apple Silicon (M‑series and newer) represents a shift for edge AI. With unified memory, high compute density, and strong power efficiency, M‑series chips offer a compelling platform for local LLM inference. The emergence of frameworks like MLX—an array computing library optimized for Apple Silicon—has made this inference practical and performant in Python environments.
 
-Apple Silicon (M-series and newer) represents a paradigm shift for edge AI. With unified memory architectures, high compute density, and power efficiency, M-series chips offer a compelling platform for local LLM inference. The emergence of frameworks like MLX—an array computing library specifically optimized for Apple Silicon—has made this inference practical and performant.
+Quantization techniques, such as 4‑bit weight quantization, further reduce model size and memory bandwidth requirements while maintaining near-original quality. Combined, these advances suggest that high-quality LLM inference is now feasible directly on consumer devices such as the Mac Mini M4.
 
-Quantization techniques, such as 4-bit weight quantization, further reduce model size and memory footprint while maintaining near-original quality. Combined, these advances suggest that high-quality LLM inference is now feasible on consumer devices.
+### 1.1 Contributions
 
-### 1.2 Contributions
+This work makes the following contributions:
 
-This paper makes the following contributions:
+- A **systematic benchmark** of Llama 3.2‑1B on Mac M4, measuring end-to-end latency and throughput across realistic prompt and output configurations.
+- A **production-grade, open-source benchmark suite** built on MLX, with configuration-driven experiments and JSON logging.
+- A **reusable analysis pipeline** that produces publication-quality figures and tables summarizing latency, throughput, and scaling with sequence length.
+- **Empirical insights** into the latency–throughput trade-offs for local LLM inference on Apple Silicon, including the effect of output length and temperature.
 
-1. **Systematic Benchmarking**: A comprehensive evaluation of Llama 3.2-1B on Mac M4, measuring latency and throughput across realistic output length and sampling configurations.
+### 1.2 Scope
 
-2. **Production-Grade Infrastructure**: A fully automated, reproducible benchmark suite (available on GitHub) that can be extended to other models and frameworks.
-
-3. **Open Analysis Pipeline**: Publication-quality visualization and statistical analysis tools that produce research-ready figures and tables.
-
-4. **Practical Insights**: Clear quantification of the latency-throughput trade-off for local inference, enabling informed decisions about deployment scenarios.
-
-### 1.3 Scope
-
-This initial study focuses on a single model (Llama 3.2-1B, 4-bit quantized) on a single Mac M4 configuration. Future work will expand to multiple models, quantization strategies, and hardware variants. The goal is to establish a methodological foundation and community resource for ongoing edge AI research.
+This initial study focuses on a single, widely-available model (Llama 3.2‑1B‑Instruct, 4‑bit quantized) on a single Mac Mini M4 configuration. The goal is to establish a clear methodology and baseline, not to exhaustively cover all models and devices. The benchmark suite is designed so that additional models, quantization schemes, and hardware can be added in future work.
 
 ---
 
-## 2. Related Work
+## 2 Related Work
 
 ### 2.1 LLM Inference Optimization
 
-Recent work has explored multiple strategies for efficient LLM inference:
+Several lines of work study how to make LLM inference more efficient. Quantization reduces parameter precision (for example, to 4 or 8 bits) to shrink memory footprint and improve cache behavior while preserving accuracy for most tasks. Techniques such as activation-aware quantization and mixed-precision arithmetic have been shown to enable substantial speedups for large models on commodity hardware.
 
-- **Quantization**: Low-bit weight and activation quantization (e.g., \[1\], \[2\]) reduces model size and memory bandwidth requirements with minimal accuracy loss.
-- **Pruning and Distillation**: Knowledge distillation to smaller models (e.g., \[3\]) and layer pruning (e.g., \[4\]) trade model capacity for speed.
-- **Specialized Inference Frameworks**: Systems like vLLM, TensorRT, and llama.cpp optimize for specific hardware targets and batching strategies.
+Other approaches include pruning, which removes parameters or whole neurons to create a sparser, more efficient model, and knowledge distillation, which trains smaller “student” models to mimic larger “teacher” models. Specialized inference runtimes such as vLLM, TensorRT‑LLM, llama.cpp, and others provide further optimizations tailored to GPU or CPU architectures.
 
-### 2.2 Apple Silicon for AI
+### 2.2 Apple Silicon for On-Device AI
 
-Recent benchmarking studies (e.g., \[5\], \[6\]) have demonstrated the viability of efficient inference on M1/M2/M3 chips. The introduction of M4 with improved GPU performance provides new opportunities for performance scaling.
+Multiple independent benchmarks and blog posts have demonstrated that Apple’s M‑series chips are competitive for certain inference workloads, especially when considering performance per watt. As each generation has improved GPU throughput and memory bandwidth, on-device inference has become increasingly practical. The M4 generation in particular targets both performance and efficiency improvements relevant for always-on and client-side AI.
 
 ### 2.3 MLX Framework
 
-MLX is a machine learning array library designed specifically for Apple Silicon, leveraging Metal Performance Shaders and unified memory. Prior work (e.g., \[7\]) has shown MLX achieves competitive throughput against other frameworks on M-series hardware.
+MLX is a machine learning array library designed specifically for Apple Silicon, with a focus on simplicity and reproducibility. It provides an API similar to NumPy but is backed by Metal Performance Shaders and other Apple libraries. Recent examples from the MLX community show that MLX can serve LLMs with competitive throughput on Mac hardware, making it a natural foundation for this benchmarking study.
 
-### 2.4 This Work
+### 2.4 Our Positioning
 
-Our contribution is to provide a detailed, open-source benchmarking study specifically targeting Mac M4 with MLX and quantized Llama 3.2-1B, filling a gap in the current literature and providing a reproducible methodology for future research.
+Most existing public benchmarks either focus on GPUs in servers, or evaluate Apple Silicon using heterogeneous tooling across different projects. This work instead provides a unified, open-source benchmark suite built entirely on MLX and run on a single Mac M4 configuration, with detailed documentation and reproducibility guarantees.
 
 ---
 
-## 3. Methodology
+## 3 Methodology
 
 ### 3.1 Hardware Platform
 
-All experiments were conducted on a single machine:
+All experiments were conducted on a single Apple Silicon desktop:
 
-- **Device**: Mac Mini M4  
-- **CPU**: 8-core M4 processor  
-- **GPU**: 10-core M4 GPU (shared with CPU)  
-- **Memory**: Unified memory (16 GB available)  
-- **Storage**: SSD (>100 GB free)  
+- **Device:** Mac Mini M4  
+- **CPU:** Apple M4 with 8 cores  
+- **GPU:** Integrated Apple M4 GPU  
+- **Memory:** 16 GB unified memory  
+- **Storage:** SSD with sufficient free space for models and logs  
+
+Although the exact CPU/GPU core counts and RAM size may differ on other Mac M4 variants, the methodology and code are portable across them.
 
 ### 3.2 Software Stack
 
-- **Python**: 3.12.x  
-- **MLX**: version 0.29.4  
-- **mlx-lm**: version 0.28.3  
-- **Analysis**: pandas 2.0+, matplotlib 3.8+, seaborn 0.13+  
-- **Source Control**: Git with public GitHub repository for reproducibility  
+The software environment is as follows:
 
-### 3.3 Model Configuration
+- **Operating System:** macOS (14.x)  
+- **Python:** 3.12.x  
+- **MLX:** 0.29.4  
+- **mlx‑lm:** 0.28.3  
+- **Analysis libraries:** pandas (for tabular data), matplotlib and seaborn (for plotting)  
+- **Utilities:** PyYAML (configuration), tqdm (progress bars), psutil (system info)  
 
-**Model**: Llama 3.2-1B-Instruct (meta-llama/Llama-3.2-1B)
+All Python dependencies are specified in `requirements.txt`, and the environment setup is documented in `SETUP.md`.
 
-- **Quantization**: 4-bit MLX format  
-- **Model Size**: ~1.1 GB on disk  
-- **Download**: MLX Community Hub (public, no authentication required)  
+### 3.3 Model
 
-### 3.4 Benchmark Protocol
+We benchmark **Llama 3.2‑1B‑Instruct** in a 4‑bit quantized format suitable for MLX:
 
-#### 3.4.1 Input Prompts
+- Base model: Meta Llama 3.2‑1B‑Instruct  
+- Format: 4‑bit quantized weights, MLX-compatible  
+- Source: Public MLX community model (no authentication required)  
 
-We use three diverse, representative prompts to evaluate generalization:
+This model represents a small but capable LLM that can run comfortably within the Mac M4’s memory capacity while providing meaningful generation quality for typical assistant-style tasks.
 
-1. "Q: What is machine learning?\nA:"  
-2. "Q: Explain quantum computing in simple terms.\nA:"  
-3. "Q: What are the main challenges in AI safety?\nA:"  
+### 3.4 Benchmark Configuration
 
-#### 3.4.2 Output Configurations
+The benchmark grid is driven by `config/models_config.yaml`. For the experiments reported in this paper, the configuration includes the following prompts and hyperparameters.
 
-For each prompt, we benchmark three target output lengths:
+#### 3.4.1 Prompts
 
-- **64 tokens**: Short, interactive responses  
-- **128 tokens**: Medium-length explanations  
-- **256 tokens**: Long-form content generation  
+Three diverse prompts are used:
 
-#### 3.4.3 Sampling
+1. “Q: What is machine learning?\nA:”  
+2. “Q: Explain quantum computing in simple terms.\nA:”  
+3. “Q: What are the main challenges in AI safety?\nA:”  
 
-To evaluate sampling stability, we test two temperatures:
+These prompts cover basic definitions, technical explanation, and open-ended reasoning.
 
-- **Temperature 0.3**: Deterministic, focused responses  
-- **Temperature 0.7**: More diverse, creative responses  
+#### 3.4.2 Output Lengths
 
-#### 3.4.4 Replication
+We benchmark three target maximum output lengths (`max_tokens`):
 
-Each unique configuration (prompt, output length, temperature) is run three times to compute statistics (mean, std).
+- 64 tokens — short, interactive responses  
+- 128 tokens — medium-length explanations  
+- 256 tokens — longer answers and summaries  
 
-#### 3.4.5 Total Experiments
+#### 3.4.3 Temperatures
 
-Configuration grid: 3 prompts × 3 output lengths × 2 temperatures × 3 runs = **54 total inference runs** (all on Llama 3.2-1B).
+Two sampling temperatures are evaluated:
+
+- 0.3 — more deterministic and focused answers  
+- 0.7 — more diverse and creative answers  
+
+Because temperature affects only sampling decisions, we expect minimal impact on timing metrics.
+
+#### 3.4.4 Replications and Total Runs
+
+For each combination of (prompt, output length, temperature), we run:
+
+- `warmup_runs = 1` (not measured)  
+- `num_runs = 3` (measured and logged)  
+
+Total measured runs:
+
+- 3 prompts × 3 output lengths × 2 temperatures × 3 runs = **54 runs**.
 
 ### 3.5 Metrics
 
-We measure:
+We focus on two core metrics:
 
-- **End-to-End Latency** (seconds): Total time from input to full output generation, including model loading, prompt encoding, and decoding.  
-- **Throughput** (tokens/second): Decoded tokens divided by latency.  
-- **Variability** (std dev): Standard deviation across replicate runs.  
+- **End-to-End Latency** (seconds): Time from sending the request to receiving the full generated output, including tokenization, decoding, and any overhead.  
+- **Throughput** (tokens per second): Number of generated tokens divided by latency.
 
-### 3.6 Implementation
+For each configuration, we compute mean, standard deviation, minimum, and maximum of these metrics across the replicate runs.
 
-We developed a modular benchmarking framework:
+### 3.6 Implementation Details
 
-- **`src/inference_cli.py`**: MLX inference wrapper using command-line interface to avoid dependency conflicts.  
-- **`benchmarks/run_benchmark.py`**: Automated grid runner with progress tracking and JSON logging.  
-- **`notebooks/analysis.py`**: Statistical analysis and figure generation.  
-- **`config/models_config.yaml`**: Configuration file specifying models, prompts, and hyperparameters.  
+The benchmark infrastructure is composed of:
 
-All code is version-controlled and available at: `https://github.com/sydkwests/llm-inference-mac-m4-optimization`
+- `src/inference_cli.py`: a CLI-based MLX inference wrapper that runs the model and prints results and timings.  
+- `benchmarks/run_benchmark.py`: orchestrates the grid of experiments, calls the CLI wrapper, parses its output, and writes JSON logs under `results/raw_results/`.  
+- `scripts/analyze_results.py`: reads all JSON logs and prints aggregated statistics by model.  
+- `notebooks/analysis.py`: loads all JSON logs into pandas, computes detailed summaries, and produces publication-quality figures (PNG files).  
 
----
-
-## 4. Results
-
-### 4.1 Overall Performance of Llama 3.2-1B
-
-Across all 54 successful inference runs on Mac M4, Llama 3.2-1B (4-bit, MLX) demonstrated stable and predictable performance:
-
-| Metric | Mean | Std Dev | Min | Max |
-|--------|------|---------|-----|-----|
-| **Latency (seconds)** | 2.68 | 0.69 | 1.93 | 3.91 |
-| **Throughput (tokens/sec)** | 51.9 | 9.89 | 40.5 | 69.4 |
-
-**Key Finding**: The model achieves a mean latency of **2.68 seconds per response** with a throughput of **51.9 tokens per second**, demonstrating that local, interactive LLM inference is practical on a Mac M4.
-
-### 4.2 Latency and Throughput Scaling with Output Length
-
-A critical analysis examines how performance changes with output length:
-
-| Output Length (tokens) | Mean Latency (s) | Mean Throughput (tok/s) |
-|------------------------|------------------|------------------------|
-| **64** | 1.99 | 42.8 |
-| **128** | 2.63 | 53.9 |
-| **256** | 3.52 | 65.2 |
-
-**Interpretation**:
-
-1. **Latency increases linearly** with output length, which is expected: longer outputs require more decoding steps.
-
-2. **Throughput improves with longer outputs**, rising from 42.8 tokens/sec at 64 tokens to 65.2 tokens/sec at 256 tokens. This occurs because the model's computation is amortized across more tokens, and overhead (prompt encoding, model loading) is absorbed by longer sequences.
-
-3. **Sub-linear latency growth**: The ratio of latency increase (1.99 → 3.52 seconds, ~77% increase) is less than the ratio of token increase (64 → 256 tokens, 300% increase), indicating efficient utilization of Mac M4 hardware.
-
-### 4.3 Temperature Effects
-
-Testing two temperatures (0.3 and 0.7) reveals:
-
-| Temperature | Mean Latency (s) | Mean Throughput (tok/s) |
-|-------------|------------------|------------------------|
-| **0.3** | 2.67 | 52.1 |
-| **0.7** | 2.69 | 51.7 |
-
-**Finding**: Temperature has **negligible impact on latency and throughput** (<0.5% difference). This is expected: sampling temperature affects token probabilities but not computation time. Both temperatures yield stable, interactive performance suitable for production use.
-
-### 4.4 Reproducibility and Variance
-
-Across replicate runs, we observe:
-
-- **Latency coefficient of variation**: σ / μ ≈ 0.26 (26%), indicating moderate variability likely due to OS scheduling and cache effects.  
-- **Throughput coefficient of variation**: σ / μ ≈ 0.19 (19%).  
-
-This variability is acceptable for edge deployment; users can expect response times in the ~2–4 second range, with throughput typically 40–70 tokens/sec.
+The repository structure and exact commands to run the benchmarks and analysis are documented in `SETUP.md` and `REPRODUCIBILITY.md`.
 
 ---
 
-## 5. Discussion
+## 4 Results
 
-### 5.1 Practical Implications
+### 4.1 Overall Performance
 
-**Interactive Inference is Feasible**: A mean latency of 2.68 seconds makes the model suitable for interactive applications (chatbots, Q&A systems) where users tolerate 2–3 second response times. A throughput of 51.9 tokens/sec is sufficient for real-time streaming output.
+Across all 54 measured runs on Llama 3.2‑1B‑Instruct (4‑bit, MLX) on Mac M4, we obtain the following aggregated statistics:
 
-**Output Length Trade-off**: While longer outputs increase latency, they also improve per-token throughput. For use cases prioritizing throughput (e.g., batch processing), requesting longer outputs is efficient. For latency-sensitive applications, shorter outputs are preferable.
+- **Mean latency:** 2.68 seconds  
+- **Latency standard deviation:** 0.69 seconds  
+- **Mean throughput:** 51.9 tokens per second  
+- **Throughput standard deviation:** 9.89 tokens per second  
+- **Latency range:** approximately 1.93 to 3.91 seconds  
+- **Throughput range:** approximately 40.5 to 69.4 tokens per second  
 
-**Privacy and Cost Benefits**: Unlike cloud-based inference, all computation occurs on the local device, eliminating cloud costs and ensuring data privacy—critical for sensitive applications (medical, legal, financial).
+These values indicate that, for the evaluated workload, a single Mac M4 can sustain interactive latency and moderate throughput for Llama 3.2‑1B.
 
-### 5.2 Comparison to Existing Work
+### 4.2 Scaling with Output Length
 
-Published benchmarks for Llama 3.2-1B on M-series hardware (e.g., \[8\], \[9\]) report throughput in the range of 40–70 tokens/sec, consistent with our observed 51.9 tokens/sec. This validation suggests our methodology and findings are representative of real-world Mac M4 inference performance.
+To examine how performance changes with output length, we group results by `max_tokens` and average over prompts and temperatures. Typical values are:
 
-### 5.3 Limitations and Future Work
+| Max Tokens | Mean Latency (s) | Mean Throughput (tokens/s) |
+|-----------:|------------------|----------------------------|
+| 64         | ≈ 1.99           | ≈ 42.8                     |
+| 128        | ≈ 2.63           | ≈ 53.9                     |
+| 256        | ≈ 3.52           | ≈ 65.2                     |
 
-**Limitations**:
+Latency increases as expected with greater output length, since more tokens must be generated. However, throughput in tokens per second improves with longer outputs. The overheads of model loading and prompt processing become relatively smaller compared to the decoding work, leading to higher effective throughput at 256 tokens than at 64 tokens.
 
-1. **Single Model**: Only Llama 3.2-1B tested; results may not generalize to larger (7B+) or smaller (<1B) models.  
-2. **Single Quantization**: Only 4-bit quantization studied; 8-bit, 16-bit, and mixed precision warrant comparison.  
-3. **Single Hardware Configuration**: One Mac M4 tested; results may vary with different M4 chips (CPU/GPU cores), RAM, and thermal conditions.  
-4. **Batch Size = 1**: No batching or pipelined inference tested; practical servers might employ these strategies.  
+Notably, the latency increase from 64 to 256 tokens (about 1.99 s to 3.52 s, ≈77% increase) is much smaller than the corresponding increase in maximum tokens (64 to 256, 300% increase), suggesting efficient utilization of the underlying hardware.
 
-**Future Directions**:
+### 4.3 Effect of Temperature
 
-1. Extend to multiple models (Mistral 7B, Qwen, etc.) and quantization schemes.  
-2. Benchmark batch inference and speculative decoding.  
-3. Compare against other frameworks (llama.cpp, CoreML, ONNX Runtime).  
-4. Study thermal and power consumption alongside latency/throughput.  
+We also examine the impact of sampling temperature on performance by grouping results by temperature:
 
-### 5.4 Reproducibility Statement
+- **Temperature 0.3:**
+  - Mean latency ≈ 2.67 seconds  
+  - Mean throughput ≈ 52.1 tokens per second  
 
-This work prioritizes reproducibility:
+- **Temperature 0.7:**
+  - Mean latency ≈ 2.69 seconds  
+  - Mean throughput ≈ 51.7 tokens per second  
 
-- **Public Code Repository**: All benchmark code, analysis scripts, and configuration files available at GitHub.  
-- **Open Data**: Raw benchmark JSON logs stored locally; users can regenerate analysis with `python notebooks/analysis.py`.  
-- **Public Models**: All models sourced from MLX Community Hub (no authentication required).  
-- **Detailed Methods**: Section 3 specifies hardware, software versions, and exact benchmark protocol.  
+Differences between the two temperatures are negligible (well within measurement noise). This matches expectations: temperature changes sampling probabilities but does not significantly affect the number of decoding steps or low-level compute behavior.
+
+### 4.4 Variability Across Runs
+
+Replication across three runs per configuration allows estimation of variability. We observe:
+
+- Latency coefficient of variation (standard deviation / mean) on the order of 0.25.  
+- Throughput coefficient of variation around 0.19.  
+
+This variability is largely driven by OS-level factors (scheduling, background processes, caching, and power/thermal management). Despite this, the range of latencies (roughly 2–4 seconds) and throughput (roughly 40–70 tokens per second) remains stable and suitable for end-user interactive applications.
+
+### 4.5 Figures
+
+The analysis pipeline produces several figures:
+
+- **Latency by Model** (for now, only Llama 3.2‑1B): boxplot showing the spread of latency across all configurations.  
+- **Throughput by Model:** analogous boxplot for tokens per second.  
+- **Latency vs. Max Tokens:** line plot showing how latency scales with output length.  
+- **Temperature Effect on Latency:** boxplot comparing latencies for different temperatures.  
+- **Latency Distribution:** histogram of mean latencies across configurations.
+
+These figures can be used directly in reports or extended as additional models are added.
 
 ---
 
-## 6. Conclusion
+## 5 Discussion
 
-We present a systematic benchmarking study of LLM inference on Mac M4 using MLX and 4-bit quantized Llama 3.2-1B. Our results confirm that practical, interactive inference is achievable on consumer Apple Silicon hardware:
+### 5.1 Practicality of Local Inference
 
-- **Average latency**: 2.68 seconds per response  
-- **Average throughput**: 51.9 tokens per second  
-- **Scaling**: Sub-linear latency growth with output length; throughput improves with longer sequences  
-- **Stability**: Temperature has negligible impact on performance; replicate runs show acceptable variance  
+The most immediate takeaway is that **local inference with Llama 3.2‑1B on Mac M4 is practical**. With a mean latency of around 2.68 seconds and typical throughput above 50 tokens per second, the system supports interactive applications such as chatbots, Q&A agents, and summarization tools without relying on cloud services.
 
-These findings enable developers and researchers to confidently deploy LLMs locally on Mac M4 for privacy-preserving, cost-effective inference. We release a complete benchmark suite and analysis pipeline to support continued research in efficient edge AI.
+For shorter outputs (64–128 tokens), latencies are closer to 2–2.5 seconds, which fits within many UX expectations for conversational systems. For longer outputs (256 tokens), latencies remain under 4 seconds while throughput improves.
 
-### Future Research Directions
+### 5.2 Privacy and Cost Benefits
 
-1. **Multi-Model Comparison**: Systematic benchmarking of diverse architectures (Mistral, Phi, Qwen).  
-2. **Quantization Sweep**: Compare 4-bit, 8-bit, and mixed-precision strategies.  
-3. **Batch and Pipeline Inference**: Enable server-like workloads on Mac M4.  
-4. **Cross-Hardware Comparison**: Extend to older M-series chips and newer M5 variants.  
-5. **Application Development**: Case studies of real-world applications (local assistants, document analysis, code generation).  
+On-device inference offers clear advantages:
+
+- **Privacy:** User data does not need to leave the device. This is especially important for sensitive domains such as healthcare, law, finance, and personal productivity.  
+- **Cost:** There are no per-token cloud inference charges. After the one-time cost of the Mac and power, inference is effectively free.  
+- **Offline Capability:** Local models can continue to work without network access.
+
+These benefits are particularly compelling given that the performance is already competitive for many mid-scale LLM use-cases.
+
+### 5.3 Limitations
+
+This study has several limitations:
+
+- **Single Model:** Only Llama 3.2‑1B was benchmarked. Larger models (e.g., 3B, 7B) may exhibit different performance characteristics and possibly exceed memory limits on certain configurations.  
+- **Single Quantization Scheme:** Only 4‑bit weight quantization was tested. Comparison with 8‑bit, 16‑bit, or mixed-precision formats is left for future work.  
+- **Single Hardware Configuration:** Results are for one Mac Mini M4 configuration. Different RAM sizes, core counts, and other M‑series chips may perform differently.  
+- **Batch Size 1:** All tests use batch size 1 (single request at a time). For high-throughput server-style deployments, batching and pipeline parallelism would be important to evaluate.
+
+### 5.4 Opportunities for Extension
+
+The benchmark suite has been intentionally designed to be extensible:
+
+- Additional models (e.g., Mistral, Phi, Qwen) can be declared in `config/models_config.yaml`.  
+- New quantization schemes or MLX model variants can be evaluated with minimal changes.  
+- New hardware configurations can be tested by running the same scripts on different Mac machines.  
+- The analysis pipeline can be expanded with new metrics (e.g., memory usage, power, GPU utilization).
 
 ---
 
-## Acknowledgments
+## 6 Conclusion
 
-This work was conducted using open-source software and models. We thank the Meta AI team for Llama 3.2, the MLX team for the inference framework, and the broader open-source AI community for enabling reproducible research.
+This work presents a systematic benchmarking study of LLM inference on Apple Silicon using MLX, focusing on Llama 3.2‑1B quantized to 4 bits and executed on a Mac Mini M4. The main findings are:
+
+- Average end-to-end latency of **2.68 seconds** per request.  
+- Average throughput of **51.9 tokens per second**.  
+- Latency scales sub-linearly with output length; throughput improves for longer outputs.  
+- Temperature has negligible impact on performance.  
+- Variability across runs is modest and consistent with system-level noise.
+
+These results demonstrate that local LLM inference on Mac M4 is both performant and practical for many real-world applications. By releasing the benchmark suite, configuration files, and analysis scripts as open source, this work aims to serve as a foundation for broader research on efficient, privacy-preserving edge AI on Apple Silicon.
 
 ---
 
 ## References
 
-\[1\] Blalock, D., Ortiz, J. J. G., Frankle, J., & Guttag, J. (2020). What's hidden in a randomly weighted neural network? *ICML*, 980–990.
+*(You can fill in or adjust these to actual citations later.)*
 
-\[2\] Lin, J., Tang, J., Tang, H., Yang, S., Dang, X., & Han, S. (2024). AWQ: Activation-aware weight quantization for LLM compression and acceleration. *arXiv preprint arXiv:2306.00978*.
-
-\[3\] Hou, X., Zhang, B., Cheng, Y., Nado, Z., & Hsieh, C. J. (2024). Scaling laws for downstream task performance in language models. *arXiv preprint arXiv:2310.14927*.
-
-\[4\] Frankle, J., Carbin, M. (2019). The lottery ticket hypothesis: Finding sparse, trainable neural networks. *ICLR*, 6892–6901.
-
-\[5\] Benchmarking AI Inference on Apple Silicon. Apple Machine Learning Research Blog, 2023.
-
-\[6\] Zheng, L., et al. (2024). Chatbot Arena: An open platform for evaluating large language models by human preferences. *arXiv preprint arXiv:2403.04132*.
-
-\[7\] Beaumont, P., et al. (2024). MLX: An efficient and reproducible machine learning framework for Apple Silicon. *JMLR*, 2024.
-
-\[8\] "Llama 3.2 on Mac M4 Benchmarks." MLX Community Hub, 2025.
-
-\[9\] "Efficient Inference on Apple Silicon." HuggingFace Blog, 2024.
+1. Quantization and efficient LLM inference literature.  
+2. MLX framework documentation and examples.  
+3. Meta Llama 3.2 model card and associated documentation.  
+4. Prior benchmarking work on Apple Silicon and on-device AI.
 
 ---
 
 ## Appendix A: Repository Structure
 
-```
+A high-level view of the repository:
+
 llm-inference-mac-m4-optimization/
-├── README.md                          # Project overview
-├── requirements.txt                   # Python dependencies
+├── README.md
+├── SETUP.md
+├── REPRODUCIBILITY.md
 ├── config/
-│   └── models_config.yaml            # Benchmark configuration
+│ └── models_config.yaml
 ├── src/
-│   ├── __init__.py
-│   └── inference_cli.py               # MLX inference wrapper
+│ └── inference_cli.py
 ├── benchmarks/
-│   ├── __init__.py
-│   └── run_benchmark.py               # Benchmark runner
+│ └── run_benchmark.py
 ├── scripts/
-│   └── analyze_results.py             # Analysis and statistics
+│ └── analyze_results.py
 ├── notebooks/
-│   └── analysis.py                    # Visualization pipeline
+│ └── analysis.py
 ├── results/
-│   ├── raw_results/                   # Raw benchmark JSON logs (git-ignored)
-│   ├── analysis/                      # CSV summaries and stats
-│   └── figures/                       # Publication-quality PNG figures
+│ ├── raw_results/
+│ ├── analysis/
+│ └── figures/
 └── paper/
-    └── paper_draft.md                 # This manuscript
-```
+└── LLM_Mac_M4_Paper.md
 
 ---
 
-## Appendix B: Reproduction Instructions
+## Appendix B: Commands to Reproduce All Results
 
-### Quick Start
+From the project root:
 
-1. Clone repository:
-   ```bash
-   git clone https://github.com/sydkwests/llm-inference-mac-m4-optimization.git
-   cd llm-inference-mac-m4-optimization
-   ```
+1. Setup
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
 
-2. Create Python environment:
-   ```bash
-   python3 -m venv venv
-   source venv/bin/activate
-   ```
+2. Run benchmarks
+PYTHONPATH=. python benchmarks/run_benchmark.py
 
-3. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
+3. Run full analysis pipeline
+python notebooks/analysis.py
 
-4. Run benchmark:
-   ```bash
-   PYTHONPATH=. python benchmarks/run_benchmark.py
-   ```
+4. Quick summary
+python scripts/analyze_results.py
 
-5. Analyze results:
-   ```bash
-   python notebooks/analysis.py
-   ```
-
-6. View figures:
-   ```bash
-   open results/figures/
-   ```
-
-### Configuration
-
-Edit `config/models_config.yaml` to modify:
-- Models tested
-- Input prompts
-- Output lengths, temperatures, and number of runs
-
----
-
-**Manuscript Version**: v1.0  
-**Date**: November 17, 2025  
-**Status**: Ready for arXiv submission  
-**Repository**: https://github.com/sydkwests/llm-inference-mac-m4-optimization
+These steps regenerate the raw JSON logs, analysis CSVs, and all figures used in this paper.
