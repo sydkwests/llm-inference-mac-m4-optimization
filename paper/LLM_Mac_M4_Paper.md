@@ -287,6 +287,7 @@ These results demonstrate that local LLM inference on Mac M4 is both performant 
 
 A high-level view of the repository:
 
+```
 llm-inference-mac-m4-optimization/
 ├── README.md                          # Project overview
 ├── SETUP.md                           # Setup / installation guide
@@ -311,7 +312,7 @@ llm-inference-mac-m4-optimization/
 │   └── figures/                       # Publication-quality PNG figures
 └── paper/
     └── LLM_Mac_M4_Paper.md            # Main manuscript
-
+```
 
 ---
 
