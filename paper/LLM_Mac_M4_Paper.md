@@ -1,6 +1,6 @@
 # Efficient Local LLM Inference on Apple Silicon: Benchmarking MLX-Quantized Models on Mac M4
 
-**Author:** Syed Furqaan Ahmed
+**Author:** Syed Furqaan Ahmed  
 **Affiliation:** Independent Researcher   
 **Email:** sydkwests@gmail.com
 
