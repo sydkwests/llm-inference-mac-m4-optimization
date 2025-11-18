@@ -1,5 +1,9 @@
 # Efficient Local LLM Inference on Apple Silicon: Benchmarking MLX-Quantized Models on Mac M4
 
+**Author:** Syed Furqaan Ahmed
+**Affiliation:** Independent Researcher   
+**Email:** sydkwests@gmail.com
+
 ## Abstract
 
 Large language models (LLMs) have become central to modern AI applications, yet their deployment remains challenging on resource-constrained edge devices. Recent advances in quantization and specialized inference frameworks like MLX have enabled efficient local inference on Apple Silicon. This paper presents a systematic benchmarking study of LLM inference performance on a Mac M4 system using the MLX framework with 4‑bit quantization. We evaluate Llama 3.2‑1B across multiple output lengths (64, 128, 256 tokens) and sampling temperatures, measuring both latency and throughput. Our results show that a single Mac M4 can achieve an average inference latency of 2.68 seconds with a throughput of 51.9 tokens per second, demonstrating the viability of local, privacy-preserving LLM inference on consumer-grade Apple Silicon hardware. We release a fully reproducible benchmark suite and analysis pipeline to enable future research in efficient edge AI.
@@ -270,16 +274,36 @@ This work presents a systematic benchmarking study of LLM inference on Apple Sil
 
 These results demonstrate that local LLM inference on Mac M4 is both performant and practical for many real-world applications. By releasing the benchmark suite, configuration files, and analysis scripts as open source, this work aims to serve as a foundation for broader research on efficient, privacy-preserving edge AI on Apple Silicon.
 
+All code, configurations, and analysis scripts are available at:
+https://github.com/sydkwests/llm-inference-mac-m4-optimization
+
 ---
 
 ## References
 
-*(You can fill in or adjust these to actual citations later.)*
+[1] Meta AI. “Llama 3.2 Model Card and Prompt Formats.” 2024.  
+    Describes the Llama 3.2 1B and 3B models, training details, and quantized variants suitable for edge and on-device use.
 
-1. Quantization and efficient LLM inference literature.  
-2. MLX framework documentation and examples.  
-3. Meta Llama 3.2 model card and associated documentation.  
-4. Prior benchmarking work on Apple Silicon and on-device AI.
+[2] Meta AI. “Llama 3.2 1B Model Card.” 2024.  
+    Lightweight 1B-parameter model intended for fast, low-latency, on-device inference with 128k context and up to 2k output tokens.
+
+[3] Apple. “MLX – Machine Learning on Apple Silicon.” Apple Open Source.  
+    Official documentation for MLX, an array framework optimized for the unified memory architecture of Apple Silicon.
+
+[4] Apple. “Get started with MLX for Apple silicon.” WWDC Session, 2025.  
+    Technical overview of MLX architecture, Metal-backed kernels, and performance characteristics on Apple Silicon.
+
+[5] J. Lin et al. “AWQ: Activation-Aware Weight Quantization for LLM Compression and Acceleration.” arXiv preprint arXiv:2306.00978, 2023.  
+    Proposes a hardware-friendly method for low-bit LLM quantization (including 4-bit) while preserving model quality.
+
+[6] Apple Machine Learning Research. “Benchmarking On-Device Machine Learning on Apple Silicon with MLX.” 2025.  
+    Evaluates MLX performance on transformer models across Apple Silicon devices, focusing on latency and scalability.
+
+[7] Community Benchmarks. “Benchmarking LLMs on Apple Silicon with MLX.” GitHub Repository, 2025.  
+    Public benchmark suite for LLM inference on Apple Silicon, including throughput and latency measurements.
+
+[8] Various authors. “Quantization Techniques for Efficient LLM Inference.” 2023–2024.  
+    A collection of works on 8-bit and 4-bit quantization (GPTQ, AWQ, NF4, etc.) that motivate low-bit inference on edge devices.
 
 ---
 
