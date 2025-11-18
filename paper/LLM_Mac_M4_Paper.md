@@ -288,25 +288,30 @@ These results demonstrate that local LLM inference on Mac M4 is both performant 
 A high-level view of the repository:
 
 llm-inference-mac-m4-optimization/
-├── README.md
-├── SETUP.md
-├── REPRODUCIBILITY.md
+├── README.md                          # Project overview
+├── SETUP.md                           # Setup / installation guide
+├── REPRODUCIBILITY.md                 # Reproducibility details
+├── RESULTS.md                         # Summary of benchmark results
+├── requirements.txt                   # Python dependencies
 ├── config/
-│ └── models_config.yaml
+│   └── models_config.yaml             # Benchmark configuration
 ├── src/
-│ └── inference_cli.py
+│   ├── __init__.py
+│   └── inference_cli.py               # MLX inference wrapper
 ├── benchmarks/
-│ └── run_benchmark.py
+│   ├── __init__.py
+│   └── run_benchmark.py               # Benchmark runner
 ├── scripts/
-│ └── analyze_results.py
+│   └── analyze_results.py             # Analysis and statistics
 ├── notebooks/
-│ └── analysis.py
+│   └── analysis.py                    # Visualization pipeline
 ├── results/
-│ ├── raw_results/
-│ ├── analysis/
-│ └── figures/
+│   ├── raw_results/                   # Raw benchmark JSON logs (git-ignored)
+│   ├── analysis/                      # CSV summaries and stats
+│   └── figures/                       # Publication-quality PNG figures
 └── paper/
-└── LLM_Mac_M4_Paper.md
+    └── LLM_Mac_M4_Paper.md            # Main manuscript
+
 
 ---
 
